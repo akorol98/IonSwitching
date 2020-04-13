@@ -9,7 +9,7 @@ import pandas as pd
 class IonSwitchingDataset(Dataset):
     """Ion Switching Dataset."""
 
-    def init(self, csv_file, window_size=1000, slice_ratio=0.5, concat_value=0.0,
+    def __init__(self, csv_file, window_size=1000, slice_ratio=0.5, concat_value=0.0,
                  train=True, transform=None):
         """
         Args:
@@ -29,10 +29,10 @@ class IonSwitchingDataset(Dataset):
         self.concat_value = concat_value
         self.train = train
 
-    def len(self):
+    def __len__(self):
         return len(self.data)
 
-    def getitem(self, idx):
+    def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
@@ -58,7 +58,7 @@ class IonSwitchingDataset(Dataset):
             signal = self.data[idx-n_before:idx+n_after, 1]
         
         if self.train:
-            n_open_channels = self.data[idx, 2]
+            n_open_channels = int(self.data[idx, 2])
             open_channels = torch.tensor(np.zeros(11))
             open_channels[n_open_channels] = 1
 
@@ -75,7 +75,7 @@ class IonSwitchingDataset(Dataset):
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
-    def call(self, sample):
+    def __call__(self, sample):
         if len(sample) > 1:
             signal, open_channels = sample['signal'], sample['open_channels']
             signal = torch.from_numpy(signal)
@@ -85,4 +85,3 @@ class ToTensor(object):
             signal = sample['signal']
             signal = torch.from_numpy(signal)
             return {'signal': signal}
-        
