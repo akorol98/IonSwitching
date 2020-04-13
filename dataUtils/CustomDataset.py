@@ -9,7 +9,7 @@ import pandas as pd
 class IonSwitchingDataset(Dataset):
     """Ion Switching Dataset."""
 
-    def __init__(self, csv_file, window_size=1000, slice_ratio=0.5, concat_value=0.0,
+    def init(self, csv_file, window_size=1000, slice_ratio=0.5, concat_value=0.0,
                  train=True, transform=None):
         """
         Args:
@@ -22,17 +22,17 @@ class IonSwitchingDataset(Dataset):
                 on a sample.
         """
 
-        self.data = pd.read_csv(csv_file)
+        self.data = pd.read_csv(csv_file).values
         self.size_w = window_size
         self.slice_ratio = slice_ratio
         self.transform = transform
         self.concat_value = concat_value
         self.train = train
 
-    def __len__(self):
+    def len(self):
         return len(self.data)
 
-    def __getitem__(self, idx):
+    def getitem(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
@@ -42,23 +42,23 @@ class IonSwitchingDataset(Dataset):
 
         if idx-n_before < 0:
             n_to_concat = n_before - idx
-            signal = self.data.signal[:idx+n_after].values
+            signal = self.data[:idx+n_after, 1]
             signal = np.concatenate(
                 (np.ones(n_to_concat)*self.concat_value, signal),
                 axis=0
             )
         elif idx+n_after > len(self.data)-1:
             n_to_concat = n_after - (len(self.data)-idx)
-            signal = self.data.signal[idx-n_before:].values
+            signal = self.data[idx-n_before:, 1]
             signal = np.concatenate(
                 (signal, np.ones(n_to_concat)*self.concat_value),
                 axis=0
             )
         else:
-            signal = self.data.signal[idx-n_before:idx+n_after].values
+            signal = self.data[idx-n_before:idx+n_after, 1]
         
         if self.train:
-            n_open_channels = self.data.open_channels[idx]
+            n_open_channels = self.data[idx, 2]
             open_channels = torch.tensor(np.zeros(11))
             open_channels[n_open_channels] = 1
 
@@ -75,7 +75,7 @@ class IonSwitchingDataset(Dataset):
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
-    def __call__(self, sample):
+    def call(self, sample):
         if len(sample) > 1:
             signal, open_channels = sample['signal'], sample['open_channels']
             signal = torch.from_numpy(signal)
