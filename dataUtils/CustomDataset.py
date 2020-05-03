@@ -42,20 +42,23 @@ class IonSwitchingDataset(Dataset):
 
         if idx-n_before < 0:
             n_to_concat = n_before - idx
-            signal = self.data[:idx+n_after, 1]
+            signal = self.data[:idx+1+n_after, 1]
             signal = np.concatenate(
-                (np.ones(n_to_concat)*self.concat_value, signal),
+                (self.data[:n_to_concat, 1], signal),
                 axis=0
             )
         elif idx+n_after > len(self.data)-1:
             n_to_concat = n_after - (len(self.data)-idx)
             signal = self.data[idx-n_before:, 1]
-            signal = np.concatenate(
-                (signal, np.ones(n_to_concat)*self.concat_value),
-                axis=0
-            )
+            if n_to_concat > 0:
+                signal = np.concatenate(
+                    (signal, self.data[-n_to_concat-1:, 1]),
+                    axis=0
+                )
         else:
-            signal = self.data[idx-n_before:idx+n_after, 1]
+            signal = self.data[np.r_[idx-n_before:idx, idx, idx+1:idx+1+n_after], 1]
+            
+#         signal = 2*(signal-signal.min())/(signal.max()-signal.min())-1
         
         if self.train:
             n_open_channels = int(self.data[idx, 2])
