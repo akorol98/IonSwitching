@@ -5,6 +5,112 @@ from torch.utils.data import Dataset
 import pandas as pd
 # import torchvision.transforms as transforms
 
+class SequensDataset2(Dataset):
+
+    def __init__(self, csv_file, seqL, probThr, num_classes, batch_ixs, transform=None,train=True):
+        """
+        Args:
+            csv_file (string): Path to the csv file with data.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.batch_ixs = batch_ixs
+        df = pd.read_csv(csv_file)
+        self.data = df.loc[self.batch_ixs].values
+        self.indices = self.data[:,-1].astype(int)
+        self.seqL = seqL
+        self.probThr = probThr
+        self.num_classes = num_classes
+        self.train=train
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)-2*(self.seqL-1)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+
+        
+        #seq 1
+        seq1 = np.array(self.data[idx:idx+self.seqL-1, -12:-12+self.num_classes])
+        seq1_1 = np.array(self.data[    idx+self.seqL-1, -12:-12+self.num_classes])
+        
+        open_channels = np.array(self.data[    idx+self.seqL-1, 2])
+        
+        label=np.array(seq1_1)
+        label[label>self.probThr]=10
+        if(label.sum()>9):
+            label=np.argmax(label)
+        else:
+            label=-1
+        
+        
+        seq1[seq1>self.probThr]=-10
+        for i in range(2):
+            rows = np.where(seq1.sum(axis=1)>-7)
+            columns = np.argmax(seq1[rows], axis=1)
+            seq1[rows,columns]=-5
+        seq1[seq1>0]=0
+        seq1[seq1<0]=1
+
+        seq1_1[np.argmax(seq1_1)]=-1
+        seq1_1[np.argmax(seq1_1)]=-1
+        seq1_1[seq1_1>0]=0
+        seq1_1[seq1_1<0]=1
+        
+        seq1=np.concatenate((seq1,seq1_1.reshape(1,-1)),axis=0)
+        
+        #seq 2
+        seq2 = np.array(self.data[idx+2*self.seqL-2:idx+self.seqL-1:-1, -12:-12+self.num_classes])
+        
+        seq2[seq2>self.probThr]=-10
+        for i in range(2):
+            rows = np.where(seq2.sum(axis=1)>-7)
+            columns = np.argmax(seq2[rows], axis=1)
+            seq2[rows,columns]=-5
+        seq2[seq2>0]=0
+        seq2[seq2<0]=1
+        
+        #seq2=np.concatenate((seq2,seq1_1.reshape(1,-1)),axis=0)
+        
+        
+
+        ## seq1 and seq2
+        rows = np.where(seq1.sum(axis=1)>1.5)
+        seq1[rows]=seq1[rows]*0.5
+        #rows = np.where(seq2.sum(axis=1)>1.5)
+        #seq2[rows]=seq2[rows]*0.5
+        
+        seq2 = seq2[::-1]
+        seq = np.concatenate((seq1, seq2), axis=0).T
+        
+        
+        index=self.indices[idx+self.seqL-1]
+        
+        
+        signal = self.data[idx:idx+2*self.seqL-1, 1]
+        
+        if self.train:
+            
+            sample = {'seq': seq,
+                      'index': index,
+                      'label': label,
+                      'lable_true' : open_channels,
+                      'signal': signal
+                     }
+        else: sample = {'seq': seq,
+                        'index': index,
+                        'label': label
+                        
+                         }
+
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample
+
 
 class IonSwitchingDataset(Dataset):
     """Ion Switching Dataset."""
@@ -38,7 +144,8 @@ class IonSwitchingDataset(Dataset):
 
         n_before = int(self.size_w*self.slice_ratio)
         n_after = self.size_w-n_before
-        columns = [0,1,2,3,4]
+#         columns = [1,2,3,4,5,6,7,8,9,10,11,12]
+        columns = [1]
         input_list = np.empty((0, self.size_w+1))
         
         if idx-n_before < 0:
@@ -91,7 +198,7 @@ class IonSwitchingDataset(Dataset):
 #         input = np.concatenate((signal,p0), axis=0)
     
         if self.train:
-            n_open_channels = int(self.data[idx, -1])
+            n_open_channels = int(self.data[idx, -2])
             open_channels = torch.tensor(np.zeros(11))
             open_channels[n_open_channels] = 1
             
@@ -104,8 +211,7 @@ class IonSwitchingDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
-
-
+    
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
@@ -122,3 +228,5 @@ class ToTensor(object):
             signal = sample['signal']
             signal = torch.from_numpy(signal)
             return {'signal': signal}
+
+     
